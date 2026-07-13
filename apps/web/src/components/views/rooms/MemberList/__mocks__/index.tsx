@@ -22,6 +22,8 @@ import {
     EventType,
     RoomStateEvent,
 } from "matrix-js-sdk/src/matrix";
+import { type CallMembership, type MatrixRTCSession } from "matrix-js-sdk/src/matrixrtc";
+import { EventEmitter } from "events";
 import { KnownMembership } from "matrix-js-sdk/src/types";
 import { vi, expect } from "vitest";
 
@@ -49,6 +51,7 @@ export type Rendered = {
     adminUsers: RoomMember[];
     moderatorUsers: RoomMember[];
     defaultUsers: RoomMember[];
+    roomSession: MatrixRTCSession;
     reRender: () => Promise<void>;
 };
 
@@ -57,10 +60,14 @@ export async function renderMemberList(
     roomSetup?: (room: Room) => void,
     usersPerLevel: number = 2,
     threePidEvents: MatrixEvent[] = [],
+    callMemberships: CallMembership[] = [],
 ): Promise<Rendered> {
     TestUtils.stubClient();
     const client = MatrixClientPeg.safeGet();
     client.hasLazyLoadMembersEnabled = () => false;
+    const roomSession = new EventEmitter() as MatrixRTCSession;
+    roomSession.memberships = callMemberships;
+    client.matrixRTC.getRoomSession = jest.fn().mockReturnValue(roomSession);
 
     // Make room
     const memberListRoom = createRoom(client);
@@ -155,6 +162,7 @@ export async function renderMemberList(
         adminUsers,
         moderatorUsers,
         defaultUsers,
+        roomSession,
         reRender,
     };
 }

@@ -42,7 +42,7 @@ describe("MemberTileView", () => {
 
         it("should not display an E2EIcon when the e2E status = normal", () => {
             const { container } = render(
-                <RoomMemberTileView item={item} member={member} index={0} memberCount={1} onFocus={vi.fn()} />,
+                <RoomMemberTileView item={item} member={member} memberIndex={0} memberCount={1} onFocus={vi.fn()} />,
             );
             const e2eIcon = container.querySelector(".mx_E2EIconView");
             expect(e2eIcon).toBeNull();
@@ -56,7 +56,7 @@ describe("MemberTileView", () => {
             } as unknown as UserVerificationStatus);
 
             const { container } = render(
-                <RoomMemberTileView item={item} member={member} index={0} memberCount={1} onFocus={vi.fn()} />,
+                <RoomMemberTileView item={item} member={member} memberIndex={0} memberCount={1} onFocus={vi.fn()} />,
             );
             await waitFor(async () => {
                 await userEvent.hover(container.querySelector(".mx_E2EIcon")!);
@@ -79,7 +79,7 @@ describe("MemberTileView", () => {
             } as DeviceVerificationStatus);
 
             const { container } = render(
-                <RoomMemberTileView item={item} member={member} index={0} memberCount={1} onFocus={vi.fn()} />,
+                <RoomMemberTileView item={item} member={member} memberIndex={0} memberCount={1} onFocus={vi.fn()} />,
             );
 
             await waitFor(async () => {
@@ -94,25 +94,25 @@ describe("MemberTileView", () => {
         it("renders user labels correctly", async () => {
             member.powerLevel = 50;
             const { container: container1 } = render(
-                <RoomMemberTileView item={item} member={member} index={0} memberCount={1} onFocus={vi.fn()} />,
+                <RoomMemberTileView item={item} member={member} memberIndex={0} memberCount={1} onFocus={vi.fn()} />,
             );
             expect(container1).toHaveTextContent("Moderator");
 
             member.powerLevel = 100;
             const { container: container2 } = render(
-                <RoomMemberTileView item={item} member={member} index={0} memberCount={1} onFocus={vi.fn()} />,
+                <RoomMemberTileView item={item} member={member} memberIndex={0} memberCount={1} onFocus={vi.fn()} />,
             );
             expect(container2).toHaveTextContent("Admin");
 
             member.powerLevel = Infinity;
             const { container: container3 } = render(
-                <RoomMemberTileView item={item} member={member} index={0} memberCount={1} onFocus={vi.fn()} />,
+                <RoomMemberTileView item={item} member={member} memberIndex={0} memberCount={1} onFocus={vi.fn()} />,
             );
             expect(container3).toHaveTextContent("Owner");
 
             member.isInvite = true;
             const { container: container4 } = render(
-                <RoomMemberTileView item={item} member={member} index={0} memberCount={1} onFocus={vi.fn()} />,
+                <RoomMemberTileView item={item} member={member} memberIndex={0} memberCount={1} onFocus={vi.fn()} />,
             );
             expect(container4).toHaveTextContent("Invited");
         });
@@ -124,7 +124,7 @@ describe("MemberTileView", () => {
                     item={item}
                     member={member}
                     isCallParticipant
-                    index={0}
+                    memberIndex={0}
                     memberCount={1}
                     onFocus={jest.fn()}
                 />,
@@ -150,7 +150,7 @@ describe("MemberTileView", () => {
                     item={item}
                     member={member}
                     isCallParticipant
-                    index={0}
+                    memberIndex={0}
                     memberCount={1}
                     onFocus={jest.fn()}
                 />,
@@ -167,7 +167,7 @@ describe("MemberTileView", () => {
                     item={item}
                     member={member}
                     isCallParticipant
-                    index={0}
+                    memberIndex={0}
                     memberCount={1}
                     onFocus={jest.fn()}
                 />,
@@ -180,7 +180,9 @@ describe("MemberTileView", () => {
         it("should call onFocus handler when focused", async () => {
             const user = userEvent.setup();
             const onFocus = vi.fn();
-            render(<RoomMemberTileView item={item} member={member} index={0} memberCount={1} onFocus={onFocus} />);
+            render(
+                <RoomMemberTileView item={item} member={member} memberIndex={0} memberCount={1} onFocus={onFocus} />,
+            );
 
             const button = screen.getByRole("option", { name: member.userId });
             await user.click(button);

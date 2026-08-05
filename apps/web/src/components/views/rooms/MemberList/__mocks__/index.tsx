@@ -21,9 +21,14 @@ import {
     User,
     EventType,
     RoomStateEvent,
+    TypedEventEmitter,
 } from "matrix-js-sdk/src/matrix";
-import { type CallMembership, type MatrixRTCSession } from "matrix-js-sdk/src/matrixrtc";
-import { EventEmitter } from "events";
+import {
+    type CallMembership,
+    type MatrixRTCSession,
+    type MatrixRTCSessionEvent,
+    type MatrixRTCSessionEventHandlerMap,
+} from "matrix-js-sdk/src/matrixrtc";
 import { KnownMembership } from "matrix-js-sdk/src/types";
 import { vi, expect } from "vitest";
 
@@ -48,10 +53,10 @@ export type Rendered = {
     client: MatrixClient;
     root: RenderResult;
     memberListRoom: Room;
-    otherRoom: Room;
     adminUsers: RoomMember[];
     moderatorUsers: RoomMember[];
     defaultUsers: RoomMember[];
+    invitedUsers: RoomMember[];
     roomSession: MatrixRTCSession;
     otherRoomSession: MatrixRTCSession;
     reRender: () => Promise<void>;
@@ -64,19 +69,25 @@ export async function renderMemberList(
     threePidEvents: MatrixEvent[] = [],
     callMemberships: CallMembership[] = [],
     otherRoomCallMemberships: CallMembership[] = [],
+    invitedUserCount: number = 0,
 ): Promise<Rendered> {
     TestUtils.stubClient();
     const client = MatrixClientPeg.safeGet();
     client.hasLazyLoadMembersEnabled = () => false;
-    const roomSession = new EventEmitter() as MatrixRTCSession;
+    const roomSession = new TypedEventEmitter<
+        MatrixRTCSessionEvent,
+        MatrixRTCSessionEventHandlerMap
+    >() as unknown as MatrixRTCSession;
     roomSession.memberships = callMemberships;
-    const otherRoomSession = new EventEmitter() as MatrixRTCSession;
+    const otherRoomSession = new TypedEventEmitter<
+        MatrixRTCSessionEvent,
+        MatrixRTCSessionEventHandlerMap
+    >() as unknown as MatrixRTCSession;
     otherRoomSession.memberships = otherRoomCallMemberships;
 
     // Make room
     const memberListRoom = createRoom(client);
-    const otherRoom = createRoom(client);
-    client.matrixRTC.getRoomSession = jest
+    client.matrixRTC.getRoomSession = vi
         .fn()
         .mockImplementation((room: Room) => (room === memberListRoom ? roomSession : otherRoomSession));
     expect(memberListRoom.roomId).toBeTruthy();
@@ -88,6 +99,7 @@ export async function renderMemberList(
     const adminUsers = [];
     const moderatorUsers = [];
     const defaultUsers = [];
+    const invitedUsers = [];
     for (let i = 0; i < usersPerLevel; i++) {
         const adminUser = new RoomMember(memberListRoom.roomId, `@admin${i}:localhost`);
         adminUser.membership = KnownMembership.Join;
@@ -119,6 +131,12 @@ export async function renderMemberList(
         defaultUser.user.lastActiveAgo = 10;
         defaultUsers.push(defaultUser);
     }
+    for (let i = 0; i < invitedUserCount; i++) {
+        const invitedUser = new RoomMember(memberListRoom.roomId, `@invited${i}:localhost`);
+        invitedUser.membership = KnownMembership.Invite;
+        invitedUser.user = User.createUser(invitedUser.userId, client);
+        invitedUsers.push(invitedUser);
+    }
 
     client.getRoom = (roomId) => {
         if (roomId === memberListRoom.roomId) return memberListRoom;
@@ -129,12 +147,14 @@ export async function renderMemberList(
         getMember: vi.fn(),
         getStateEvents: TestUtils.mockStateEventImplementation(threePidEvents),
         getInviteForThreePidToken: vi.fn().mockReturnValue(null),
-        getInvitedMemberCount: vi.fn().mockReturnValue(0),
-        getJoinedMemberCount: vi.fn().mockReturnValue(adminUsers.length + moderatorUsers.length + defaultUsers.length),
+        getInvitedMemberCount: vi.fn().mockReturnValue(invitedUsers.length),
+        getJoinedMemberCount: vi
+            .fn()
+            .mockReturnValue(adminUsers.length + moderatorUsers.length + defaultUsers.length),
         on: vi.fn(),
         off: vi.fn(),
     } as unknown as RoomState;
-    for (const member of [...adminUsers, ...moderatorUsers, ...defaultUsers]) {
+    for (const member of [...adminUsers, ...moderatorUsers, ...defaultUsers, ...invitedUsers]) {
         memberListRoom.currentState.members[member.userId] = member;
     }
 
@@ -157,7 +177,7 @@ export async function renderMemberList(
     );
     await waitFor(async () => {
         expect(root.container.querySelectorAll(".mx_MemberTileView")).toHaveLength(
-            usersPerLevel * 3 + threePidEvents.length,
+            usersPerLevel * 3 + invitedUserCount + threePidEvents.length,
         );
     });
 
@@ -167,10 +187,10 @@ export async function renderMemberList(
         client,
         root,
         memberListRoom,
-        otherRoom,
         adminUsers,
         moderatorUsers,
         defaultUsers,
+        invitedUsers,
         roomSession,
         otherRoomSession,
         reRender,

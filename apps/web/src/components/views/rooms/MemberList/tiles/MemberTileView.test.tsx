@@ -28,7 +28,7 @@ import { type ThreePIDInvite } from "../../../../../models/rooms/ThreePIDInvite"
 
 describe("MemberTileView", () => {
     describe("RoomMemberTileView", () => {
-        const item = {} as { member: RoomMember };
+        let item: ReturnType<typeof sdkRoomMemberToRoomMember>;
         let matrixClient: MatrixClient;
         let member: RoomMember;
 
@@ -36,8 +36,8 @@ describe("MemberTileView", () => {
             matrixClient = TestUtils.stubClient();
             vi.mocked(matrixClient.isRoomEncrypted).mockReturnValue(true);
             const sdkMember = new SdkRoomMember("roomId", matrixClient.getUserId()!);
-            member = sdkRoomMemberToRoomMember(sdkMember)!.member!;
-            item.member = member;
+            item = sdkRoomMemberToRoomMember(sdkMember);
+            member = item.member!;
         });
 
         it("should not display an E2EIcon when the e2E status = normal", () => {

@@ -34,12 +34,10 @@ import { TestSDKContext } from "../../../../../../test/unit-tests/TestSDKContext
 import MemberListView from "../MemberListView";
 import MatrixClientContext from "../../../../../contexts/MatrixClientContext";
 import { type Call, CallEvent } from "../../../../../models/Call";
-import { useCall } from "../../../../../hooks/useCall";
+import * as UseCallModule from "../../../../../hooks/useCall";
 
-vi.mock("../../../../../hooks/useCall", async () => {
-    const actual = await vi.importActual<typeof import("../../../../../hooks/useCall")>(
-        "../../../../../hooks/useCall",
-    );
+vi.mock("../../../../../hooks/useCall", async (importOriginal) => {
+    const actual = await importOriginal<typeof UseCallModule>();
     return { ...actual, useCall: vi.fn() };
 });
 
@@ -75,7 +73,9 @@ export class TestCall extends EventEmitter {
 }
 
 const callsByRoomId = new Map<string, TestCall>();
-vi.mocked(useCall).mockImplementation((roomId) => (callsByRoomId.get(roomId) as unknown as Call) ?? null);
+vi.mocked(UseCallModule.useCall).mockImplementation(
+    (roomId) => (callsByRoomId.get(roomId) as unknown as Call) ?? null,
+);
 
 export function createRoom(client: MatrixClient, opts = {}) {
     const roomId = "!" + Math.random().toString().slice(2, 10) + ":domain";

@@ -48,13 +48,12 @@ describe("FallbackIceServerController", () => {
         MatrixClientBackedController.matrixClient = client;
         expect(controller.settingDisabled).toBeFalsy();
 
-        const wellKnown = {
+        const clientWellKnown = {
             "io.element.voip": {
                 disable_fallback_ice: true,
             },
         };
-        vi.spyOn(client, "getClientWellKnown").mockResolvedValue(wellKnown);
-        client.emit(ClientEvent.ClientWellKnown, wellKnown);
+        client.emit(ClientEvent.ClientWellKnown, clientWellKnown);
 
         expect(controller.settingDisabled).toBeTruthy();
     });

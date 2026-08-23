@@ -34,7 +34,7 @@ export const useConnectionState = (call: Call | null): ConnectionState =>
         useCallback((state) => state ?? call?.connectionState ?? ConnectionState.Disconnected, [call]),
     );
 
-const useParticipants = (call: Call | null): Map<RoomMember, Set<string>> => {
+export const useParticipants = (call: Call | null): Map<RoomMember, Set<string>> => {
     return useTypedEventEmitterState(
         call ?? undefined,
         CallEvent.Participants,

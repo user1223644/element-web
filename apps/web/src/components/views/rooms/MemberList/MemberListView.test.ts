@@ -14,7 +14,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { waitFor, fireEvent } from "test-utils-rtl";
 import { filterConsole, mkThirdPartyInviteEvent } from "test-utils";
 import { type Room, type RoomMember, MatrixEvent } from "matrix-js-sdk/src/matrix";
-import { type CallMembership, MatrixRTCSessionEvent } from "matrix-js-sdk/src/matrixrtc";
+import { type CallMembership } from "matrix-js-sdk/src/matrixrtc";
 
 import { type Rendered, renderMemberList } from "./__mocks__";
 
@@ -161,15 +161,14 @@ describe("MemberListView and MemberlistHeaderView", () => {
         });
 
         it("should show and hide the call icon when a member joins and leaves the room call", async () => {
-            const { root, roomSession, defaultUsers } = rendered;
+            const { root, call, defaultUsers } = rendered;
             const memberTile = root.container.querySelector(`[aria-label="${defaultUsers[0].userId}"]`)!;
             expect(memberTile.querySelector(".mx_RoomMemberTileView_callIcon")).toBeNull();
             expect(root.container.querySelector(".mx_MemberListView_separator")).toBeNull();
 
             const membership = { userId: defaultUsers[0].userId } as CallMembership;
             await act(async () => {
-                roomSession.memberships = [membership];
-                roomSession.emit(MatrixRTCSessionEvent.MembershipsChanged, [], [membership]);
+                call.setMemberships([membership]);
             });
             expect(memberTile.querySelector(".mx_RoomMemberTileView_callIcon")).not.toBeNull();
             expect(root.container.querySelector(".mx_MemberListView_separator")).not.toBeNull();
@@ -178,8 +177,7 @@ describe("MemberListView and MemberlistHeaderView", () => {
             );
 
             await act(async () => {
-                roomSession.memberships = [];
-                roomSession.emit(MatrixRTCSessionEvent.MembershipsChanged, [membership], []);
+                call.setMemberships([]);
             });
             expect(memberTile.querySelector(".mx_RoomMemberTileView_callIcon")).toBeNull();
             expect(root.container.querySelector(".mx_MemberListView_separator")).toBeNull();
@@ -187,7 +185,8 @@ describe("MemberListView and MemberlistHeaderView", () => {
         });
 
         it("should preserve an active search when call memberships change", async () => {
-            const { root, roomSession, adminUsers } = await renderMemberList(true, undefined, 7);
+            rendered.root.unmount();
+            const { root, call, adminUsers } = await renderMemberList(true, undefined, 7);
             const searchInput = root.container.querySelector<HTMLInputElement>('input[name="searchMembers"]')!;
 
             fireEvent.change(searchInput, { target: { value: "admin0" } });
@@ -197,8 +196,7 @@ describe("MemberListView and MemberlistHeaderView", () => {
 
             const membership = { userId: adminUsers[0].userId } as CallMembership;
             await act(async () => {
-                roomSession.memberships = [membership];
-                roomSession.emit(MatrixRTCSessionEvent.MembershipsChanged, [], [membership]);
+                call.setMemberships([membership]);
             });
 
             expect(searchInput).toHaveValue("admin0");
@@ -209,7 +207,7 @@ describe("MemberListView and MemberlistHeaderView", () => {
         });
 
         it("should ignore stale member loads after call memberships change", async () => {
-            const { root, roomSession, context, memberListRoom, adminUsers, moderatorUsers } = rendered;
+            const { root, call, context, memberListRoom, adminUsers, moderatorUsers } = rendered;
             const loadResult = await context.memberListStore.loadMemberList(memberListRoom.roomId);
             const firstLoad = Promise.withResolvers<typeof loadResult>();
             const secondLoad = Promise.withResolvers<typeof loadResult>();
@@ -221,14 +219,12 @@ describe("MemberListView and MemberlistHeaderView", () => {
             const secondMembership = { userId: moderatorUsers[0].userId } as CallMembership;
 
             await act(async () => {
-                roomSession.memberships = [firstMembership];
-                roomSession.emit(MatrixRTCSessionEvent.MembershipsChanged, [], [firstMembership]);
+                call.setMemberships([firstMembership]);
             });
             await waitFor(() => expect(loadMemberList).toHaveBeenCalledTimes(1));
 
             await act(async () => {
-                roomSession.memberships = [secondMembership];
-                roomSession.emit(MatrixRTCSessionEvent.MembershipsChanged, [firstMembership], [secondMembership]);
+                call.setMemberships([secondMembership]);
             });
             await waitFor(() => expect(loadMemberList).toHaveBeenCalledTimes(2));
 
@@ -246,12 +242,12 @@ describe("MemberListView and MemberlistHeaderView", () => {
         });
 
         it("should remain loading when a stale initial member load resolves", async () => {
+            rendered.root.unmount();
             type LoadResult = Awaited<ReturnType<Rendered["context"]["memberListStore"]["loadMemberList"]>>;
-            const discardedStrictModeLoad = Promise.withResolvers<LoadResult>();
             const initialLoad = Promise.withResolvers<LoadResult>();
             const membershipLoad = Promise.withResolvers<LoadResult>();
             const setup = Promise.withResolvers<{
-                roomSession: Rendered["roomSession"];
+                call: Rendered["call"];
                 loadMemberList: jest.SpiedFunction<Rendered["context"]["memberListStore"]["loadMemberList"]>;
                 loadResult: LoadResult;
             }>();
@@ -263,25 +259,23 @@ describe("MemberListView and MemberlistHeaderView", () => {
                 [],
                 [],
                 0,
-                async (context, roomSession, memberListRoom) => {
+                async (context, call, memberListRoom) => {
                     const loadResult = await context.memberListStore.loadMemberList(memberListRoom.roomId);
                     const loadMemberList = jest
                         .spyOn(context.memberListStore, "loadMemberList")
-                        .mockImplementationOnce(() => discardedStrictModeLoad.promise)
                         .mockImplementationOnce(() => initialLoad.promise)
                         .mockImplementationOnce(() => membershipLoad.promise);
-                    setup.resolve({ roomSession, loadMemberList, loadResult });
+                    setup.resolve({ call, loadMemberList, loadResult });
                 },
             );
-            const { roomSession, loadMemberList, loadResult } = await setup.promise;
-            await waitFor(() => expect(loadMemberList).toHaveBeenCalledTimes(2));
+            const { call, loadMemberList, loadResult } = await setup.promise;
+            await waitFor(() => expect(loadMemberList).toHaveBeenCalledTimes(1));
 
             const membership = { userId: "@moderator0:localhost" } as CallMembership;
             await act(async () => {
-                roomSession.memberships = [membership];
-                roomSession.emit(MatrixRTCSessionEvent.MembershipsChanged, [], [membership]);
+                call.setMemberships([membership]);
             });
-            await waitFor(() => expect(loadMemberList).toHaveBeenCalledTimes(3));
+            await waitFor(() => expect(loadMemberList).toHaveBeenCalledTimes(2));
 
             await act(async () => initialLoad.resolve(loadResult));
             expect(document.body).toHaveTextContent("Loading");
@@ -291,10 +285,10 @@ describe("MemberListView and MemberlistHeaderView", () => {
             expect(root.container.querySelector(".mx_MemberTileView")).toHaveAccessibleName(
                 "@moderator0:localhost, in a call",
             );
-            await act(async () => discardedStrictModeLoad.resolve(loadResult));
         });
 
         it("should group call participants first while preserving the order within both groups", async () => {
+            rendered.root.unmount();
             const participantUserIds = ["@moderator1:localhost", "@default0:localhost"];
             const memberships = participantUserIds.map((userId) => ({ userId }) as CallMembership);
             const { root } = await renderMemberList(true, undefined, 2, memberships);
@@ -321,6 +315,7 @@ describe("MemberListView and MemberlistHeaderView", () => {
         });
 
         it("should not render adjacent separators when all joined members are in the call", async () => {
+            rendered.root.unmount();
             const participantUserIds = [
                 "@admin0:localhost",
                 "@admin1:localhost",
@@ -337,6 +332,7 @@ describe("MemberListView and MemberlistHeaderView", () => {
         });
 
         it("should not count separators as members when deciding whether to show search", async () => {
+            rendered.root.unmount();
             const memberships = [{ userId: "@admin0:localhost" }] as CallMembership[];
             const { root } = await renderMemberList(true, undefined, 6, [], memberships, [], 1);
 
@@ -346,14 +342,14 @@ describe("MemberListView and MemberlistHeaderView", () => {
         });
 
         it("should show one call icon for a member with multiple devices in the room call", async () => {
+            rendered.root.unmount();
             const userId = "@admin0:localhost";
             const memberships = [
                 { userId, deviceId: "DEVICE_1", memberId: `${userId}:DEVICE_1` },
                 { userId, deviceId: "DEVICE_2", memberId: `${userId}:DEVICE_2` },
             ] as CallMembership[];
-            const { root, memberListRoom, client } = await renderMemberList(true, undefined, 2, memberships);
+            const { root } = await renderMemberList(true, undefined, 2, [], memberships);
 
-            expect(client.matrixRTC.getRoomSession).toHaveBeenCalledWith(memberListRoom);
             expect(root.container.querySelectorAll(".mx_RoomMemberTileView_callIcon")).toHaveLength(1);
             expect(
                 root.container
@@ -368,18 +364,19 @@ describe("MemberListView and MemberlistHeaderView", () => {
         });
 
         it("should ignore call memberships and updates from other rooms", async () => {
+            rendered.root.unmount();
             const userId = "@admin0:localhost";
             const otherRoomMembership = {
                 userId,
                 deviceId: "OTHER_ROOM_DEVICE",
                 memberId: `${userId}:OTHER_ROOM_DEVICE`,
             } as CallMembership;
-            const { root, otherRoomSession } = await renderMemberList(true, undefined, 2, [], [otherRoomMembership]);
+            const { root, otherCall } = await renderMemberList(true, undefined, 2);
             const memberTile = root.container.querySelector(`[aria-label="${userId}"]`)!;
 
             expect(memberTile.querySelector(".mx_RoomMemberTileView_callIcon")).toBeNull();
             await act(async () => {
-                otherRoomSession.emit(MatrixRTCSessionEvent.MembershipsChanged, [], [otherRoomMembership]);
+                otherCall.setMemberships([otherRoomMembership]);
             });
             expect(memberTile.querySelector(".mx_RoomMemberTileView_callIcon")).toBeNull();
             expect(root.container.querySelector(".mx_MemberListView_separator")).toBeNull();

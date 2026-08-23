@@ -7,6 +7,7 @@ SPDX-License-Identifier: AGPL-3.0-only OR GPL-3.0-only OR LicenseRef-Element-Com
 Please see LICENSE files in the repository root for full details.
 */
 
+import EventEmitter from "node:events";
 import React, { act } from "react";
 import { render, type RenderResult, waitFor } from "test-utils-rtl";
 // Import VirtuosoMockContext from shared-components to ensure context compatibility
@@ -21,14 +22,8 @@ import {
     User,
     EventType,
     RoomStateEvent,
-    TypedEventEmitter,
 } from "matrix-js-sdk/src/matrix";
-import {
-    type CallMembership,
-    type MatrixRTCSession,
-    type MatrixRTCSessionEvent,
-    type MatrixRTCSessionEventHandlerMap,
-} from "matrix-js-sdk/src/matrixrtc";
+import { type CallMembership } from "matrix-js-sdk/src/matrixrtc";
 import { KnownMembership } from "matrix-js-sdk/src/types";
 import { vi, expect } from "vitest";
 
@@ -38,6 +33,49 @@ import { SDKContext } from "../../../../../contexts/SDKContext";
 import { TestSDKContext } from "../../../../../../test/unit-tests/TestSDKContext";
 import MemberListView from "../MemberListView";
 import MatrixClientContext from "../../../../../contexts/MatrixClientContext";
+import { type Call, CallEvent } from "../../../../../models/Call";
+import { useCall } from "../../../../../hooks/useCall";
+
+vi.mock("../../../../../hooks/useCall", async () => {
+    const actual = await vi.importActual<typeof import("../../../../../hooks/useCall")>(
+        "../../../../../hooks/useCall",
+    );
+    return { ...actual, useCall: vi.fn() };
+});
+
+export class TestCall extends EventEmitter {
+    public participants: Map<RoomMember, Set<string>>;
+
+    public constructor(
+        private readonly membersByUserId: ReadonlyMap<string, RoomMember>,
+        memberships: CallMembership[] = [],
+    ) {
+        super();
+        this.participants = this.toParticipants(memberships);
+    }
+
+    public setMemberships(memberships: CallMembership[]): void {
+        const previousParticipants = this.participants;
+        this.participants = this.toParticipants(memberships);
+        this.emit(CallEvent.Participants, this.participants, previousParticipants);
+    }
+
+    private toParticipants(memberships: CallMembership[]): Map<RoomMember, Set<string>> {
+        const participants = new Map<RoomMember, Set<string>>();
+        for (const membership of memberships) {
+            const member = this.membersByUserId.get(membership.userId);
+            if (!member) continue;
+
+            const devices = participants.get(member) ?? new Set<string>();
+            devices.add(membership.deviceId ?? membership.memberId);
+            participants.set(member, devices);
+        }
+        return participants;
+    }
+}
+
+const callsByRoomId = new Map<string, TestCall>();
+vi.mocked(useCall).mockImplementation((roomId) => (callsByRoomId.get(roomId) as unknown as Call) ?? null);
 
 export function createRoom(client: MatrixClient, opts = {}) {
     const roomId = "!" + Math.random().toString().slice(2, 10) + ":domain";
@@ -58,8 +96,8 @@ export type Rendered = {
     moderatorUsers: RoomMember[];
     defaultUsers: RoomMember[];
     invitedUsers: RoomMember[];
-    roomSession: MatrixRTCSession;
-    otherRoomSession: MatrixRTCSession;
+    call: TestCall;
+    otherCall: TestCall;
     reRender: () => Promise<void>;
 };
 
@@ -71,31 +109,14 @@ export async function renderMemberList(
     callMemberships: CallMembership[] = [],
     otherRoomCallMemberships: CallMembership[] = [],
     invitedUserCount: number = 0,
-    beforeRender?: (
-        context: TestSDKContext,
-        roomSession: MatrixRTCSession,
-        memberListRoom: Room,
-    ) => void | Promise<void>,
+    beforeRender?: (context: TestSDKContext, call: TestCall, memberListRoom: Room) => void | Promise<void>,
 ): Promise<Rendered> {
     TestUtils.stubClient();
     const client = MatrixClientPeg.safeGet();
     client.hasLazyLoadMembersEnabled = () => false;
-    const roomSession = new TypedEventEmitter<
-        MatrixRTCSessionEvent,
-        MatrixRTCSessionEventHandlerMap
-    >() as unknown as MatrixRTCSession;
-    roomSession.memberships = callMemberships;
-    const otherRoomSession = new TypedEventEmitter<
-        MatrixRTCSessionEvent,
-        MatrixRTCSessionEventHandlerMap
-    >() as unknown as MatrixRTCSession;
-    otherRoomSession.memberships = otherRoomCallMemberships;
 
     // Make room
     const memberListRoom = createRoom(client);
-    client.matrixRTC.getRoomSession = vi
-        .fn()
-        .mockImplementation((room: Room) => (room === memberListRoom ? roomSession : otherRoomSession));
     expect(memberListRoom.roomId).toBeTruthy();
 
     // Give the test an opportunity to make changes to room before first render
@@ -164,10 +185,17 @@ export async function renderMemberList(
         memberListRoom.currentState.members[member.userId] = member;
     }
 
+    const membersByUserId = new Map(
+        [...adminUsers, ...moderatorUsers, ...defaultUsers, ...invitedUsers].map((member) => [member.userId, member]),
+    );
+    const call = new TestCall(membersByUserId, callMemberships);
+    const otherCall = new TestCall(membersByUserId, otherRoomCallMemberships);
+    callsByRoomId.set(memberListRoom.roomId, call);
+
     const context = new TestSDKContext();
     context._client = client;
     context.memberListStore.isPresenceEnabled = vi.fn().mockReturnValue(enablePresence);
-    await beforeRender?.(context, roomSession, memberListRoom);
+    await beforeRender?.(context, call, memberListRoom);
     const root = render(
         <MatrixClientContext.Provider value={client}>
             <SDKContext.Provider value={context}>
@@ -187,6 +215,7 @@ export async function renderMemberList(
             usersPerLevel * 3 + invitedUserCount + threePidEvents.length,
         );
     });
+    await waitFor(() => expect(call.listenerCount(CallEvent.Participants)).toBeGreaterThan(0));
 
     const reRender = createReRenderFunction(client, memberListRoom);
 
@@ -199,8 +228,8 @@ export async function renderMemberList(
         moderatorUsers,
         defaultUsers,
         invitedUsers,
-        roomSession,
-        otherRoomSession,
+        call,
+        otherCall,
         reRender,
     };
 }

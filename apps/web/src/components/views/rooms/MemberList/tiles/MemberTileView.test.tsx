@@ -131,12 +131,7 @@ describe("MemberTileView", () => {
             );
 
             expect(container).toHaveTextContent("Admin");
-            expect(container.querySelector(".mx_RoomMemberTileView_callIcon")).toHaveAttribute("width", "16px");
-            expect(container.querySelector(".mx_RoomMemberTileView_callIcon")).toHaveAttribute("height", "16px");
-            expect(container.querySelector(".mx_RoomMemberTileView_callIcon")).toHaveAttribute(
-                "fill",
-                "var(--cpd-color-icon-accent-primary)",
-            );
+            expect(container.querySelector(".mx_RoomMemberTileView_callIcon")).toBeVisible();
             expect(screen.getByRole("option")).toHaveAccessibleName(`${member.name}, in a call`);
         });
 

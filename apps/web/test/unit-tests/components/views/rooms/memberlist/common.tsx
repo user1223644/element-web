@@ -33,12 +33,10 @@ import { TestSDKContext } from "../../../../TestSDKContext";
 import MemberListView from "../../../../../../src/components/views/rooms/MemberList/MemberListView";
 import MatrixClientContext from "../../../../../../src/contexts/MatrixClientContext";
 import { type Call, CallEvent } from "../../../../../../src/models/Call";
-import { useCall } from "../../../../../../src/hooks/useCall";
+import * as UseCallModule from "../../../../../../src/hooks/useCall";
 
 jest.mock("../../../../../../src/hooks/useCall", () => {
-    const actual = jest.requireActual<typeof import("../../../../../../src/hooks/useCall")>(
-        "../../../../../../src/hooks/useCall",
-    );
+    const actual = jest.requireActual<typeof UseCallModule>("../../../../../../src/hooks/useCall");
     return { ...actual, useCall: jest.fn() };
 });
 
@@ -74,7 +72,9 @@ export class TestCall extends EventEmitter {
 }
 
 const callsByRoomId = new Map<string, TestCall>();
-jest.mocked(useCall).mockImplementation((roomId) => (callsByRoomId.get(roomId) as unknown as Call) ?? null);
+jest.mocked(UseCallModule.useCall).mockImplementation(
+    (roomId) => (callsByRoomId.get(roomId) as unknown as Call) ?? null,
+);
 
 export function createRoom(client: MatrixClient, opts = {}) {
     const roomId = "!" + Math.random().toString().slice(2, 10) + ":domain";

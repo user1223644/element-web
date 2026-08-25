@@ -73,9 +73,7 @@ export class TestCall extends EventEmitter {
 }
 
 const callsByRoomId = new Map<string, TestCall>();
-vi.mocked(UseCallModule.useCall).mockImplementation(
-    (roomId) => (callsByRoomId.get(roomId) as unknown as Call) ?? null,
-);
+vi.mocked(UseCallModule.useCall).mockImplementation((roomId) => (callsByRoomId.get(roomId) as unknown as Call) ?? null);
 
 export function createRoom(client: MatrixClient, opts = {}) {
     const roomId = "!" + Math.random().toString().slice(2, 10) + ":domain";
@@ -175,9 +173,7 @@ export async function renderMemberList(
         getStateEvents: TestUtils.mockStateEventImplementation(threePidEvents),
         getInviteForThreePidToken: vi.fn().mockReturnValue(null),
         getInvitedMemberCount: vi.fn().mockReturnValue(invitedUsers.length),
-        getJoinedMemberCount: vi
-            .fn()
-            .mockReturnValue(adminUsers.length + moderatorUsers.length + defaultUsers.length),
+        getJoinedMemberCount: vi.fn().mockReturnValue(adminUsers.length + moderatorUsers.length + defaultUsers.length),
         on: vi.fn(),
         off: vi.fn(),
     } as unknown as RoomState;

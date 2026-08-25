@@ -211,7 +211,7 @@ describe("MemberListView and MemberlistHeaderView", () => {
             const loadResult = await context.memberListStore.loadMemberList(memberListRoom.roomId);
             const firstLoad = Promise.withResolvers<typeof loadResult>();
             const secondLoad = Promise.withResolvers<typeof loadResult>();
-            const loadMemberList = jest
+            const loadMemberList = vi
                 .spyOn(context.memberListStore, "loadMemberList")
                 .mockImplementationOnce(() => firstLoad.promise)
                 .mockImplementationOnce(() => secondLoad.promise);
@@ -248,7 +248,7 @@ describe("MemberListView and MemberlistHeaderView", () => {
             const membershipLoad = Promise.withResolvers<LoadResult>();
             const setup = Promise.withResolvers<{
                 call: Rendered["call"];
-                loadMemberList: jest.SpiedFunction<Rendered["context"]["memberListStore"]["loadMemberList"]>;
+                loadMemberList: ReturnType<typeof vi.spyOn>;
                 loadResult: LoadResult;
             }>();
             const renderPromise = renderMemberList(
@@ -261,7 +261,7 @@ describe("MemberListView and MemberlistHeaderView", () => {
                 0,
                 async (context, call, memberListRoom) => {
                     const loadResult = await context.memberListStore.loadMemberList(memberListRoom.roomId);
-                    const loadMemberList = jest
+                    const loadMemberList = vi
                         .spyOn(context.memberListStore, "loadMemberList")
                         .mockImplementationOnce(() => initialLoad.promise)
                         .mockImplementationOnce(() => membershipLoad.promise);
@@ -291,7 +291,7 @@ describe("MemberListView and MemberlistHeaderView", () => {
             rendered.root.unmount();
             const participantUserIds = ["@moderator1:localhost", "@default0:localhost"];
             const memberships = participantUserIds.map((userId) => ({ userId }) as CallMembership);
-            const { root } = await renderMemberList(true, undefined, 2, memberships);
+            const { root } = await renderMemberList(true, undefined, 2, [], memberships);
 
             const memberTiles = Array.from(root.container.querySelectorAll(".mx_MemberTileView"));
             const orderedUserIds = memberTiles.map((tile) => tile.getAttribute("aria-label")!.split(", in a call")[0]);
@@ -371,7 +371,7 @@ describe("MemberListView and MemberlistHeaderView", () => {
                 deviceId: "OTHER_ROOM_DEVICE",
                 memberId: `${userId}:OTHER_ROOM_DEVICE`,
             } as CallMembership;
-            const { root, otherCall } = await renderMemberList(true, undefined, 2);
+            const { root, otherCall } = await renderMemberList(true, undefined, 2, [], [], [otherRoomMembership]);
             const memberTile = root.container.querySelector(`[aria-label="${userId}"]`)!;
 
             expect(memberTile.querySelector(".mx_RoomMemberTileView_callIcon")).toBeNull();

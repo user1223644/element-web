@@ -126,7 +126,7 @@ describe("MemberTileView", () => {
                     isCallParticipant
                     memberIndex={0}
                     memberCount={1}
-                    onFocus={jest.fn()}
+                    onFocus={vi.fn()}
                 />,
             );
 
@@ -136,9 +136,9 @@ describe("MemberTileView", () => {
         });
 
         it("should render the call icon alongside the E2E status", async () => {
-            mocked(matrixClient.getCrypto()!.getUserVerificationStatus).mockResolvedValue({
-                isCrossSigningVerified: jest.fn().mockReturnValue(false),
-                wasCrossSigningVerified: jest.fn().mockReturnValue(true),
+            vi.mocked(matrixClient.getCrypto()!.getUserVerificationStatus).mockResolvedValue({
+                isCrossSigningVerified: vi.fn().mockReturnValue(false),
+                wasCrossSigningVerified: vi.fn().mockReturnValue(true),
             } as unknown as UserVerificationStatus);
 
             const { container } = render(
@@ -148,7 +148,7 @@ describe("MemberTileView", () => {
                     isCallParticipant
                     memberIndex={0}
                     memberCount={1}
-                    onFocus={jest.fn()}
+                    onFocus={vi.fn()}
                 />,
             );
 
@@ -165,7 +165,7 @@ describe("MemberTileView", () => {
                     isCallParticipant
                     memberIndex={0}
                     memberCount={1}
-                    onFocus={jest.fn()}
+                    onFocus={vi.fn()}
                 />,
             );
 

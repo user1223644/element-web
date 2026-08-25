@@ -72,7 +72,7 @@ describe("MemberListHeaderView", () => {
             newMember.user.lastActiveAgo = 10;
             memberListRoom.currentState.members[newMember.userId] = newMember;
         }
-        mocked(memberListRoom.currentState.getJoinedMemberCount).mockReturnValue(20);
+        vi.mocked(memberListRoom.currentState.getJoinedMemberCount).mockReturnValue(20);
         act(() => {
             memberListRoom.emit(RoomEvent.Summary, {
                 "m.heroes": [],
